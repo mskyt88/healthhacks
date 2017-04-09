@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Simple Map</title>
+        <meta name="viewport" content="initial-scale=1.0">
+        <meta charset="utf-8">
+        <style>
+            html, body {
+                height: 100%;
+                margin: 0;          
+                padding: 0;
+            }
+            #map {
+                height: 100%;
+            }
+            .map-frame {
+                height: 500px;
+                margin : auto;
+            }
+            .map-frame h1 {
+                margin-bottom: 3px;
+            }
+            .map-frame button {
+                margin-bottom: 3px;
+            }
+            .left {
+                float: left;
+                width: 70%;
+                height: 70%;
+                overflow: hidden;
+            }
+            .right {
+                float: left;
+                width: 30%;
+                height: 70%;
+                overflow-y: scroll;
+                overflow-x: hidden;
+            }
+            .right img {
+                width: 80%;
+                height: auto;
+                display: block;
+                margin: 0 auto;
+            }
+            .bottom {
+                clear: left;
+                width: auto;
+                margin: auto;
+                height: 30%;
+
+            }
+            .bottom img {
+                height: auto;
+                width: auto;
+                margin: auto;
+
+            }
+            #img-window {
+                max-height: 500px;
+            }
+
+        </style>
+    </head>
+    <body>
+        <div class="map-frame">
+            <div align="center"><h1>Breeding Ground Map</h1></div>
+            <div align="center">
+                    <button onClick="toggleHeatmap()">Toggle gradient</button>
+                    <button onClick="toggleMarkers()">Toggle markers</button>
+            </div>
+            <div class="left">
+          
+                <div id="map"></div>
+            </div>
+            <div class="right">
+
+            </div>
+       
+            <div class="bottom">
+                <p id="display" align="center"></p>
+            </div>
+        </div>
+
+        <script>
+
+            
+////////////////////////////////////////////////////////
+// Global variables
+            var map, heatmap;
+            var gradient = [
+              'rgba(0, 128, 0, 0.3)',
+              'rgba(128, 128, 0, 0.7)',
+              'rgba(255, 128, 0, 0.7)',
+              'rgba(255, 90, 0, 1)',
+              'rgba(255, 40, 0, 1)',
+              'rgba(255, 20, 0, 1)',
+              'rgba(255, 0, 0, 1)'
+            ];
+
+            var pre_breeding_ground = [
+                [0,-22.965449, -43.196033,0.9],
+                [1,-22.949326, -43.195604,0.7],
+                [2,-22.961102, -43.180154,0.5],
+                [3,-22.965370, -43.184188,0.8],
+                [4,-22.980068, -43.197492,0.4],
+                [5,-22.961656, -43.175777,0.8],
+                [6,-22.957546, -43.209079,0.9],
+                [7,-22.971218, -43.219379,0.9],
+                [8,-22.948536, -43.200067,0.5],
+                [9,-22.943794, -43.186420,0.7],
+                [10,-22.923769, -43.176318,0.9],
+                [11,-22.946350, -43.191127,0.7],
+                [12,-22.968437, -43.238952,0.5],
+                [13,-22.908850, -43.246073,1],
+                [14,-22.957975, -43.171463,0.7],
+                [15,-22.924946, -43.197614,0.7],
+                [16,-22.9253157,-43.197701,1]
+                ];
+            //Image 16 is from 
+            //https://maps.googleapis.com/maps/api/streetview?size=600x500&location=-22.9253157,-43.1977018&fov=90&heading=180&pitch=10&key=AIzaSyBiFPFyoLr1YQS95jegfykRdOJzdfikeW8
+            var markers= [];
+            var points = [];
+            
+////////////////////////////////////////////////////////
+// Click event for image
+            function checkImg(element) {
+                var src = element.src;
+                var src_split = src.split("/");
+                var filename = src_split[src_split.length -1];
+                if (filename[0] == 'n') {
+                    alert("This image is not including breeding grounds!");    
+                } else {
+                    var imgNum = parseInt(filename.slice(1));
+                    alert("A breeding ground is detected!");
+                    var spot = pre_breeding_ground[imgNum];
+                    var existing = 0;
+                    for (var i=0;i<markers.length;i++) {
+                        var lat = markers[i].getPosition().lat();
+                        var lng = markers[i].getPosition().lng();
+                        if (Math.abs(lat - spot[1]) <= 0.000001 && Math.abs(lng - spot[2]) <= 0.000001) {
+                            existing = 1;
+                            console.log(existing);
+                            break;
+                        }
+                    }
+                    if (existing == 0) {
+                        var marker = new google.maps.Marker({
+                            position: {lat: parseFloat(spot[1]), lng: parseFloat(spot[2])},
+                            map: map,
+                            title: spot[0].toString()
+                        });
+                        if (spot[3] >= 0.9) {
+                            marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_red.png');
+                        } else if (spot[3] >= 0.7) {
+                            marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_orange.png');
+                        } else {
+                            marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_yellow.png');
+                        }
+                        marker.addListener('click', function(){
+                            var lat = this.getPosition().lat();
+                            var lng = this.getPosition().lng();
+                            var imgNum = -1;
+                            for (var i=0;i<pre_breeding_ground.length;i++) {
+                                console.log(pre_breeding_ground[i][1] + " " + lat);
+                                console.log(pre_breeding_ground[i][2] + " " + lng);
+                                if (Math.abs(pre_breeding_ground[i][1] - lat) <= 0.000001 && Math.abs(pre_breeding_ground[i][2] - lng) <= 0.000001 ) {
+                                    imgNum = i;
+                                }
+                            }
+                            console.log(imgNum);
+                            if (imgNum >= 0) {
+                                var contentString = '<div style="height:500px !important; line-height:normal;overflow: auto;white-space: nowrap;"><img align="middle" src="http://zika-virus-monitoring.weebly.com/files/theme/img/b' + imgNum + '.jpg"></div>'
+                                var infowindow = new google.maps.InfoWindow({
+                                    content: contentString,
+                                    maxHeight: 800
+                                });
+                                //document.getElementById("display").innerHTML = "<img align=\"middle\" src=\"http://zika-virus-monitoring.weebly.com/files/theme/img/b" + imgNum + ".jpg\"></span>";
+                                infowindow.open(map, this);
+                            }
+
+                        });
+                        marker.addListener('mouseout', function(){
+                            document.getElementById("display").innerHTML = "";
+                        });
+                        markers.push(marker);
+                        points.push({location: new google.maps.LatLng(spot[1],spot[2]), weight: spot[3]});
+                        heatmap.setData(points);
+                    }
+                }
+                
+            }
+            
+////////////////////////////////////////////////////////
+// Read local file(breeding_ground.txt)
+            function readTextFile(file) {
+                var rawFile = new XMLHttpRequest();
+                var allText = '';
+                rawFile.open("GET", file, false);
+                rawFile.onreadystatechange = function () {
+                    if(rawFile.readyState === 4) {
+                        if(rawFile.status === 200 || rawFile.status == 0) {
+                            allText = rawFile.responseText;
+                        }
+                    }
+                }
+                rawFile.send(null);
+                return allText;
+            }
+            var data_text = '';
+            data_text = data_text + readTextFile("breeding_ground.txt");
+            console.log(data_text);
+        
+////////////////////////////////////////////////////////
+// Transform text data to 2-D array        
+
+            var breeding_ground = data_text.split("\n");
+            console.log(breeding_ground);
+            for (var i=0;i<breeding_ground.length;i++) {
+                breeding_ground[i]=breeding_ground[i].split(",");
+            }
+            console.log(breeding_ground);        
+
+////////////////////////////////////////////////////////
+// Draw google map
+// Overlay the breeding ground information         
+        
+            function initMap() { 
+                var myCenter = {lat: -22.936903,  lng: -43.220351};
+                map = new google.maps.Map(document.getElementById('map'), {
+                    center: myCenter,
+                    zoom: 15,
+                    mapTypeId: google.maps.MapTypeId.SATELLITE
+                  });
+                //For now, we don't initialize markers
+                //setMarkers(map);
+                heatmap = new google.maps.visualization.HeatmapLayer({
+                //For now, we don't initialize heatmap points
+                //    data: getPoints(),
+                    map: map
+                });
+
+
+                heatmap.set('radius', getNewRadius(map.getZoom()));
+                heatmap.set('gradient', gradient);
+                map.addListener('zoom_changed', function() {
+                    heatmap.setOptions({radius:getNewRadius(map.getZoom())});
+                });
+                initMarkerPoint(map);
+            }
+////////////////////////////////////////////////////////
+// Initialize markers and points
+            function initMarkerPoint(map) {
+                for (var i = 10; i < pre_breeding_ground.length; i++) {
+                    var spot = pre_breeding_ground[i];
+                    var marker = new google.maps.Marker({
+                        position: {lat: parseFloat(spot[1]), lng: parseFloat(spot[2])},
+                        map: map,
+                        title: spot[0].toString()
+                    });
+                    if (spot[3] >= 0.9) {
+                        marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_red.png');
+                    } else if (spot[3] >= 0.7) {
+                        marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_orange.png');
+                    } else {
+                        marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_yellow.png');
+                    }
+                    console.log(spot[1]);
+                    console.log(spot[2]);
+                    marker.addListener('mouseover', function(){
+                        var lat = this.getPosition().lat();
+                        var lng = this.getPosition().lng();
+                        var imgNum = -1;
+                        for (var i=0;i<pre_breeding_ground.length;i++) {
+                            console.log(pre_breeding_ground[i][1] + " " +pre_breeding_ground[i][2]);
+                            console.log(lat + " " + lng);
+                            if (Math.abs(pre_breeding_ground[i][1] - lat) <= 0.000001 && Math.abs(pre_breeding_ground[i][2] - lng) <= 0.000001 ) {
+                                imgNum = i;
+                            }
+                        }
+                        console.log(imgNum);
+                        if (imgNum >= 0) {
+                            document.getElementById("display").innerHTML = "<img align=\"middle\" src=\"http://zika-virus-monitoring.weebly.com/files/theme/img/b" + imgNum + ".jpg\">";
+                            console.log("test");
+                        }
+                    });
+                    marker.addListener('mouseout', function(){
+                        document.getElementById("display").innerHTML = "";
+                    });
+                    markers.push(marker);
+                    points.push({location: new google.maps.LatLng(spot[1],spot[2]), weight: spot[3]});
+
+                }
+                heatmap.setData(points);
+
+            }
+            
+////////////////////////////////////////////////////////
+// Change the pin color based on the probability
+
+            function setMarkers(map) {
+                for (var i = 0; i < breeding_ground.length; i++) {
+                    var spot = breeding_ground[i];
+                    var marker = new google.maps.Marker({
+                        position: {lat: parseFloat(spot[1]), lng: parseFloat(spot[2])},
+                        map: map,
+                        title: spot[0]
+                    });
+                    if (spot[3] >= 0.9) {
+                        marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_red.png');
+                    } else if (spot[3] >= 0.7) {
+                        marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_orange.png');
+                    } else {
+                        marker.setIcon('http://labs.google.com/ridefinder/images/mm_20_yellow.png');
+                    }
+                    markers.push(marker);
+
+                }
+            }
+////////////////////////////////////////////////////////
+// Show/Hide markers;           
+            function toggleMarkers() {
+                for (var i = 0; i < markers.length; i++) {
+                    console.log(markers[i].getMap());
+                    markers[i].setMap(markers[i].getMap() ? null : map);
+                }
+            }
+
+            
+////////////////////////////////////////////////////////
+// Recalculate the radius of heatmap point
+// heatmap point has a fixed pixel radius, so we need to recalculate whenever zoom level changes.
+            function getNewRadius(zoom) {
+                var scale = 1 << zoom;
+                var distPerScale = 0.010;
+                return scale * distPerScale;
+                
+            }
+
+////////////////////////////////////////////////////////
+// Generate heatmap-like gradation
+            function getPoints() {
+                for (var i=0; i< breeding_ground.length; i++) {
+                    var spot = breeding_ground[i];
+                    points.push({location: new google.maps.LatLng(parseFloat(spot[1]),parseFloat(spot[2])), weight: parseFloat(spot[3])});
+                }
+                console.log(points);
+                return points;
+            }
+
+////////////////////////////////////////////////////////
+// Show/Hide heatmap
+            function toggleHeatmap() {
+                heatmap.setMap(heatmap.getMap() ? null : map);
+            }
+
+
+        </script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyC3LsuT0_kNA_f7EFX1CWLXXw8iw1y38xA&callback=initMap&libraries=visualization"
+        async defer></script>
+    </body>
+</html>
